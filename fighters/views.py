@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+import traceback
 import requests
 from django.conf import settings
 from .utils import extract_tournament_id, has_passed_and_more_than_3_days
@@ -113,11 +114,12 @@ class TournamentEventsView(APIView):
 challonge.set_credentials(settings.CHALLONGE_USERNAME, settings.CHALLONGE_API_KEY)
 
 class TournamentDetailsChallongeView(APIView):
-    def get(self, request, *args, **kwargs):
-        tournament_id = kwargs.get('tournament_id')
+    
+    def get(self, request, tournament_id, *args, **kwargs):
+        print(tournament_id)
 
         try:
-            # Recupera la información del torneo
+            # Recupera la información del torneo desde Challonge
             tournament = challonge.tournaments.show(tournament_id)
             participants = challonge.participants.index(tournament_id)
 
@@ -134,51 +136,45 @@ class TournamentDetailsChallongeView(APIView):
                     "live_image_url": tournament.get("live_image_url"),
                     "private": tournament.get("private"),
                     "sign_up_url": tournament.get("sign_up_url"),
-                    "game_name": tournament.get("game_name"),   
-                    "sign_up_url": tournament.get("sign_up_url"),
-                    "start_at": tournament.get("start_at"),
+                    "game_name": tournament.get("game_name"),
                     "participants_count": tournament.get("participants_count"),
                 },
                 "participants_count": len(participants),
             }
-            
-             # Obtén la instancia del torneo
-            tournament_instance = ChallongeTournament.objects.get(idTournament=tournament_id)
-            
-            print(tournament_id)
-            
 
-            # Actualiza el nombre del juego si está vacío y si 'game_name' en data es válido
-            
-            if tournament_instance.sign_up_url == "" and "sign_up_url" in data["tournament"] and data["tournament"]["sign_up_url"]:
-                tournament_instance.sign_up_url = data["tournament"]["sign_up_url"]
-                tournament_instance.save()  # Guarda y termina si hay un cambio
-                
-            if tournament_instance.start_at == None and "start_at" in data["tournament"] and data["tournament"]["start_at"]:
-                tournament_instance.start_at = data["tournament"]["start_at"]
-                tournament_instance.save()  # Guarda y termina si hay un cambio
-                
-            if tournament_instance.game_name == "" and "game_name" in data["tournament"] and data["tournament"]["game_name"]:
-                tournament_instance.game_name = data["tournament"]["game_name"]
-                tournament_instance.save()  # Guarda y termina si hay un cambio
+            # Intenta obtener la instancia del torneo en la base de datos
+            try:
+                tournament_instance = ChallongeTournament.objects.get(idTournament=tournament_id)
 
-            # Actualiza el nombre del torneo si es "Pendiente" y si 'name' en data es válido
-            if tournament_instance.name == "Pendiente" and "name" in data["tournament"] and data["tournament"]["name"]:
-                tournament_instance.name = data["tournament"]["name"]
-                tournament_instance.save()  # Guarda y termina si hay un cambio
+                # Actualiza el modelo según los datos obtenidos de la API
+                if tournament_instance.sign_up_url == "" and "sign_up_url" in data["tournament"] and data["tournament"]["sign_up_url"]:
+                    tournament_instance.sign_up_url = data["tournament"]["sign_up_url"]
+                    tournament_instance.save()
 
-            # Marca el torneo como completo si su estado es "complete", independientemente de su estado actual
-            if data["tournament"]["state"] == "complete" and not tournament_instance.is_completed:
-                tournament_instance.is_completed = True
-                tournament_instance.save()  # Guarda y termina si hay un cambio
+                if tournament_instance.start_at is None and "start_at" in data["tournament"] and data["tournament"]["start_at"]:
+                    tournament_instance.start_at = data["tournament"]["start_at"]
+                    tournament_instance.save()
 
+                if tournament_instance.game_name == "" and "game_name" in data["tournament"] and data["tournament"]["game_name"]:
+                    tournament_instance.game_name = data["tournament"]["game_name"]
+                    tournament_instance.save()
 
-            
-            
-            
+                if tournament_instance.name == "Pendiente" and "name" in data["tournament"] and data["tournament"]["name"]:
+                    tournament_instance.name = data["tournament"]["name"]
+                    tournament_instance.save()
+
+                if data["tournament"]["state"] == "complete" and not tournament_instance.is_completed:
+                    tournament_instance.is_completed = True
+                    tournament_instance.save()
+
+            except ChallongeTournament.DoesNotExist:
+                # Si el torneo no está en la base de datos, simplemente muestra un mensaje
+                print(f"Tournament instance with ID {tournament_id} does not exist in the database.")
+
             return Response(data, status=status.HTTP_200_OK)
 
-        except challonge.exceptions.ChallongeException as err:
-            return Response({"error": f"Challonge API error occurred: {err}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
+            # Agrega esto para depuración
+            print(f"Unexpected error: {e}")
+            print(traceback.format_exc())  # Imprime la traza completa del error
             return Response({"error": f"An unexpected error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
