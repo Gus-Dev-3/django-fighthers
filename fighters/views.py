@@ -180,7 +180,7 @@ class TournamentDetailsChallongeView(APIView):
             return Response({"error": f"An unexpected error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class TwitchUserOnline(APIView):
-    
+
     def get(self, request, format=None):
         # Obtener todos los usuarios que tienen como plataforma Twitch
         users = StreamUser.objects.filter(platform='TW')
@@ -195,23 +195,44 @@ class TwitchUserOnline(APIView):
             'Authorization': 'Bearer ' + settings.TWITCH_JWT_TOKEN
         }
         
-        # Recorremos los usuarios y consultamos si están en vivo
+        # Primero, obtenemos los streams en vivo
+        stream_data = []
         for user in users:
             url = f'https://api.twitch.tv/helix/streams?user_login={user.user_name}'
             response = requests.get(url, headers=headers)
             if response.status_code == 200:
                 data = response.json()
-                # Si el usuario está en vivo, agregamos los datos
                 if data['data']:  # La lista 'data' no está vacía, significa que el usuario está en vivo
-                    user_data = StreamUserSerializer(user).data  # Serializamos los datos del usuario
-                    data['data'][0]['channel'] = user_data  # Añadimos los detalles del usuario a la respuesta
-                    live_users.append(data['data'][0])
+                    stream_info = data['data'][0]
+                    stream_info['user_login'] = user.user_name  # Guardamos el nombre de usuario para la siguiente solicitud
+                    stream_data.append(stream_info)
             else:
                 continue
-
-        # Si no hay usuarios en vivo, devolver un mensaje de error
-        if not live_users:
+        
+        if not stream_data:
             return Response({'error': 'No hay usuarios en vivo'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Retornamos la lista de streamers en vivo
-        return Response({"streamers": live_users}, status=status.HTTP_200_OK)
+        # Ahora obtenemos la información de los usuarios para agregar `profile_image_url`
+        for stream_info in stream_data:
+            user_login = stream_info['user_login']
+            url = f'https://api.twitch.tv/helix/users?login={user_login}'
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                if data['data']:
+                    user_info = data['data'][0]
+                    # Agregamos `profile_image_url` a la información del stream
+                    stream_info['profile_image_url'] = user_info['profile_image_url']
+            else:
+                stream_info['profile_image_url'] = None  # Si la solicitud falla, podemos agregar un valor por defecto
+
+        # Ahora serializamos los datos y retornamos la respuesta
+        response_data = []
+        for stream_info in stream_data:
+            user_data = next((user for user in users if user.user_name == stream_info['user_login']), None)
+            if user_data:
+                serialized_user = StreamUserSerializer(user_data).data
+                stream_info['channel'] = serialized_user  # Anidar la información del usuario
+                response_data.append(stream_info)
+
+        return Response({"streamers": response_data}, status=status.HTTP_200_OK)
