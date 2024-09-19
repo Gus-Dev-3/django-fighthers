@@ -40,3 +40,18 @@ class Post(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     img_url = models.ImageField(upload_to='posts', blank=False, validators=[validate_image])
+
+
+class StreamUser(models.Model):
+    STREAMING_PLATFORMS = (
+        ('TW', 'Twitch'),
+        ('YT', 'YouTube'),
+        ('FB', 'Facebook'),
+    )
+    
+    user_name = models.CharField(max_length=150, blank=False)
+    platform = models.CharField(max_length=2, choices=STREAMING_PLATFORMS, default='TW', blank=False)
+
+    def __str__(self):
+        return f"{self.user_name} - {self.get_platform_display()}"
+

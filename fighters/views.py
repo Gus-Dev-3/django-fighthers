@@ -5,8 +5,8 @@ import traceback
 import requests
 from django.conf import settings
 from .utils import extract_tournament_id, has_passed_and_more_than_3_days
-from .models import StarGGTournament, ChallongeTournament,Post
-from .serializers import StarGGTournamentSerializer, ChallongeTournamentSerializer, PostSerializer
+from .models import StarGGTournament, ChallongeTournament,Post,StreamUser
+from .serializers import StarGGTournamentSerializer, ChallongeTournamentSerializer, PostSerializer,StreamUserSerializer
 import challonge
 
 class StarGGTournamentListView(APIView):
@@ -178,3 +178,40 @@ class TournamentDetailsChallongeView(APIView):
             print(f"Unexpected error: {e}")
             print(traceback.format_exc())  # Imprime la traza completa del error
             return Response({"error": f"An unexpected error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class TwitchUserOnline(APIView):
+    
+    def get(self, request, format=None):
+        # Obtener todos los usuarios que tienen como plataforma Twitch
+        users = StreamUser.objects.filter(platform='TW')
+        
+        # Verificar si no hay usuarios en la base de datos
+        if not users.exists():
+            return Response({'error': 'No hay usuarios registrados en la plataforma'}, status=status.HTTP_404_NOT_FOUND)
+        
+        live_users = []
+        headers = {
+            'Client-ID': settings.TWITCH_CLIENT_ID,
+            'Authorization': 'Bearer ' + settings.TWITCH_JWT_TOKEN
+        }
+        
+        # Recorremos los usuarios y consultamos si están en vivo
+        for user in users:
+            url = f'https://api.twitch.tv/helix/streams?user_login={user.user_name}'
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                # Si el usuario está en vivo, agregamos los datos
+                if data['data']:  # La lista 'data' no está vacía, significa que el usuario está en vivo
+                    user_data = StreamUserSerializer(user).data  # Serializamos los datos del usuario
+                    data['data'][0]['channel'] = user_data  # Añadimos los detalles del usuario a la respuesta
+                    live_users.append(data['data'][0])
+            else:
+                continue
+
+        # Si no hay usuarios en vivo, devolver un mensaje de error
+        if not live_users:
+            return Response({'error': 'No hay usuarios en vivo'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Retornamos la lista de streamers en vivo
+        return Response({"streamers": live_users}, status=status.HTTP_200_OK)

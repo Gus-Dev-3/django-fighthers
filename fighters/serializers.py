@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import StarGGTournament, ChallongeTournament, Post
+from .models import StarGGTournament, ChallongeTournament, Post,StreamUser
 
 
 class StarGGTournamentSerializer(serializers.ModelSerializer):
@@ -35,3 +35,8 @@ class PostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = "__all__"
+
+class StreamUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StreamUser
+        fields = ['user_name', 'platform']  # Los campos que quieres incluir en la respuesta

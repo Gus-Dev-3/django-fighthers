@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import StarGGTournament, ChallongeTournament, Post
+from .models import StarGGTournament, ChallongeTournament, Post, StreamUser
 
 
 admin.site.register(StarGGTournament)
@@ -47,3 +47,4 @@ class PostAdmin(admin.ModelAdmin):
 
 # Registra el modelo con el admin
 admin.site.register(Post, PostAdmin)
+admin.site.register(StreamUser)
