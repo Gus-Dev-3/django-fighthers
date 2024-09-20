@@ -125,6 +125,8 @@ class TournamentEventsView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Configura las credenciales de Challonge
+challonge.set_credentials(settings.CHALLONGE_USERNAME, settings.CHALLONGE_API_KEY)
 
 class TournamentDetailsChallongeView(APIView):
     
