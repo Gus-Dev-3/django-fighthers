@@ -7,6 +7,7 @@ from django.conf import settings
 from .utils import extract_tournament_id, has_passed_and_more_than_3_days
 from .models import StarGGTournament, ChallongeTournament,Post,StreamUser
 from .serializers import StarGGTournamentSerializer, ChallongeTournamentSerializer, PostSerializer,StreamUserSerializer
+from django.core.cache import cache
 import challonge
 
 class StarGGTournamentListView(APIView):
@@ -242,6 +243,12 @@ class YouTubeChannelsView(APIView):
     API_KEY = settings.GOOGLE_API_KEY
 
     def get(self, request):
+        cache_key = 'youtube_live_channels'
+        cached_results = cache.get(cache_key)
+
+        if cached_results is not None:
+            return Response(cached_results, status=status.HTTP_200_OK)
+
         results = []
         users = StreamUser.objects.filter(platform='YT')
         
@@ -293,6 +300,9 @@ class YouTubeChannelsView(APIView):
                         "viewers": viewers,
                         "live_url": live_url  # URL para ver el video en vivo
                     })
+
+        # Cachear resultados, incluso si está vacío
+        cache.set(cache_key, results, timeout=600)
 
         # Retorna una lista vacía si no hay resultados
         return Response(results, status=status.HTTP_200_OK if results else status.HTTP_204_NO_CONTENT)
