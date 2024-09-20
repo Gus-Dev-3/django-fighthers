@@ -30,9 +30,10 @@ class PostListView(APIView):
         
         
 
+import logging
+
 class TournamentEventsView(APIView):
 
-    
     def get(self, request, *args, **kwargs):
         # URL de la API de GraphQL
         url = settings.URL_STARTGG_API
@@ -68,6 +69,8 @@ class TournamentEventsView(APIView):
         variables = {
             "tourneySlug": request.query_params.get("idTournament", "default-slug"),
         }
+        
+        print(request.query_params.get("idTournament", "default-slug"))
 
         # Encabezados de la solicitud
         headers = {
@@ -86,8 +89,17 @@ class TournamentEventsView(APIView):
             response = requests.post(url, json=payload, headers=headers)
             response_data = response.json()
 
+            # Log para verificar la estructura de la respuesta
+            logging.info(f"Response data: {response_data}")
+
             # Obtener el valor endAt del primer evento en la respuesta
-            end_at_timestamp = response_data.get('data', {}).get('tournament', {}).get('endAt')
+            tournament_data = response_data.get('data', {}).get('tournament')
+            
+            if not tournament_data:
+                logging.error("No se encontró el objeto 'tournament' en la respuesta.")
+                return Response({"error": "Tournament data not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            end_at_timestamp = tournament_data.get('endAt')
             
             # Verificar si la fecha y hora del torneo han pasado más de 3 días
             if end_at_timestamp and has_passed_and_more_than_3_days(end_at_timestamp):
@@ -98,21 +110,21 @@ class TournamentEventsView(APIView):
                     # Setear is_completed a True
                     tournament_instance.is_completed = True
                     tournament_instance.save()
-                    print("El atributo is_completed se ha actualizado a True.")
+                    logging.info("El atributo is_completed se ha actualizado a True.")
                 except StarGGTournament.DoesNotExist:
-                    print("No se encontró el torneo con el id proporcionado.")
+                    logging.error("No se encontró el torneo con el id proporcionado.")
             else:
-                print("La fecha y hora no han pasado más de 3 días.")
+                logging.info("La fecha y hora no han pasado más de 3 días.")
             
             # Retornar la respuesta de la API en formato JSON
             return Response(response_data, status=response.status_code)
 
         except requests.exceptions.RequestException as e:
             # Manejar errores de la solicitud
+            logging.error(f"Error en la solicitud: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# Configura las credenciales de Challonge
-challonge.set_credentials(settings.CHALLONGE_USERNAME, settings.CHALLONGE_API_KEY)
+
 
 class TournamentDetailsChallongeView(APIView):
     

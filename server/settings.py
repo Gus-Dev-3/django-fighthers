@@ -96,7 +96,7 @@ WSGI_APPLICATION = 'server.wsgi.application'
 
 
 
-if DEBUG:
+if not DEBUG:
     DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
