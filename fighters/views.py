@@ -4,11 +4,12 @@ from rest_framework import status
 import traceback
 import requests
 from django.conf import settings
-from .utils import extract_tournament_id, has_passed_and_more_than_3_days
+from .utils import has_passed_and_more_than_3_days
 from .models import StarGGTournament, ChallongeTournament,Post,StreamUser
 from .serializers import StarGGTournamentSerializer, ChallongeTournamentSerializer, PostSerializer,StreamUserSerializer
 from django.core.cache import cache
 import challonge
+import logging
 
 class StarGGTournamentListView(APIView):
     def get(self, request, format=None):
@@ -30,7 +31,7 @@ class PostListView(APIView):
         
         
 
-import logging
+
 
 class TournamentEventsView(APIView):
 
@@ -260,63 +261,73 @@ class YouTubeChannelsView(APIView):
         cache_key = 'youtube_live_channels'
         cached_results = cache.get(cache_key)
 
+        # Verifica si hay resultados en la caché
         if cached_results is not None:
+            print("Se devuelve la respuesta desde la caché.")
             return Response(cached_results, status=status.HTTP_200_OK)
 
+        print("Se realiza una nueva consulta a la API de YouTube.")
         results = []
         users = StreamUser.objects.filter(platform='YT')
-        
-        # Verificar si no hay usuarios en la base de datos
+
         if not users.exists():
             return Response({'error': 'No hay usuarios registrados en la plataforma'}, status=status.HTTP_404_NOT_FOUND)
 
         for user in users:
-            channel_id = user.user_name  # Usar user_name como channel_id para YouTube
-            # 1. Verificar si está en vivo
+            channel_id = user.user_name
+            if not channel_id:  # Verifica que channel_id no esté vacío
+                continue
+
             live_check_url = f'https://www.googleapis.com/youtube/v3/search?part=snippet&channelId={channel_id}&type=video&eventType=live&key={self.API_KEY}'
-            live_response = requests.get(live_check_url)
+            try:
+                live_response = requests.get(live_check_url)
+                live_response.raise_for_status()  # Lanza un error si la respuesta no es 200
+                live_data = live_response.json()
+            except requests.exceptions.RequestException as e:
+                print(f"Error en la consulta a la API de YouTube para live_check: {e}")
+                continue
 
-            if live_response.status_code != 200:
-                continue  # Si falla la consulta, simplemente salta al siguiente canal
+            if 'items' not in live_data or not live_data['items']:
+                continue
 
-            live_data = live_response.json()
+            video_id = live_data['items'][0]['id']['videoId']
+            live_url = f'https://www.youtube.com/watch?v={video_id}'
 
-            if live_data['items']:
-                video_id = live_data['items'][0]['id']['videoId']
-                live_url = f'https://www.youtube.com/watch?v={video_id}'  # URL para redirigir al video en vivo
-
-                # 2. Obtener estadísticas del canal
-                channel_stats_url = f'https://www.googleapis.com/youtube/v3/channels?part=statistics,snippet&id={channel_id}&key={self.API_KEY}'
+            channel_stats_url = f'https://www.googleapis.com/youtube/v3/channels?part=statistics,snippet&id={channel_id}&key={self.API_KEY}'
+            try:
                 channel_response = requests.get(channel_stats_url)
-
-                if channel_response.status_code != 200:
-                    continue  # Salta si no se puede obtener la información del canal
-
+                channel_response.raise_for_status()  # Lanza un error si la respuesta no es 200
                 channel_data = channel_response.json()
+            except requests.exceptions.RequestException as e:
+                print(f"Error en la consulta a la API de YouTube para channel_stats: {e}")
+                continue
 
-                if channel_data['items']:
-                    channel_name = channel_data['items'][0]['snippet']['title']
-                    profile_image = channel_data['items'][0]['snippet']['thumbnails']['default']['url']  # URL de la foto de perfil
+            if 'items' not in channel_data or not channel_data['items']:
+                continue
 
-                    # 3. Obtener detalles del video en vivo
-                    live_details_url = f'https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={video_id}&key={self.API_KEY}'
-                    details_response = requests.get(live_details_url)
+            channel_name = channel_data['items'][0]['snippet']['title']
+            profile_image = channel_data['items'][0]['snippet']['thumbnails']['default']['url']
 
-                    if details_response.status_code != 200:
-                        continue  # Salta si no se puede obtener los detalles del video en vivo
+            # Obtener detalles del video en vivo para el número de espectadores
+            live_details_url = f'https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={video_id}&key={self.API_KEY}'
+            viewers = "N/A"  # Valor predeterminado si no se puede obtener
+            try:
+                details_response = requests.get(live_details_url)
+                details_response.raise_for_status()  # Lanza un error si la respuesta no es 200
+                details_data = details_response.json()
+                if 'items' in details_data and details_data['items']:
+                    viewers = details_data['items'][0]['liveStreamingDetails'].get('concurrentViewers', "N/A")
+            except requests.exceptions.RequestException as e:
+                print(f"Error en la consulta a la API de YouTube para live_details: {e}")
 
-                    details_data = details_response.json()
-                    viewers = details_data['items'][0]['liveStreamingDetails'].get('concurrentViewers', None)
+            results.append({
+                "channel_name": channel_name,
+                "profile_image": profile_image,
+                "viewers": viewers,
+                "live_url": live_url
+            })
 
-                    results.append({
-                        "channel_name": channel_name,
-                        "profile_image": profile_image,
-                        "viewers": viewers,
-                        "live_url": live_url  # URL para ver el video en vivo
-                    })
-
-        # Cachear resultados, incluso si está vacío
+        # Cachear los resultados
         cache.set(cache_key, results, timeout=600)
 
-        # Retorna una lista vacía si no hay resultados
         return Response(results, status=status.HTTP_200_OK if results else status.HTTP_204_NO_CONTENT)

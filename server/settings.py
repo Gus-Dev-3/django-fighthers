@@ -139,16 +139,20 @@ USE_I18N = True
 USE_TZ = True
 
 # Cache
+# settings.py
+
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',  # Nombre único para la instancia de caché
+        'LOCATION': 'unique-snowflake',  # Puedes cambiar esto si lo deseas
     }
 }
 
 
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
+
 
 STATIC_URL = 'static/'
 STATICFILES_DIR = os.path.join(BASE_DIR, 'static')
