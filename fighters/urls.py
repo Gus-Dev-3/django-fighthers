@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import TournamentEventsView,TwitchUserOnline,YouTubeChannelsView,TournamentDetailsChallongeView,StarGGTournamentListView, ChallongeTournamentListView, PostListView
+from .views import TournamentEventsView,TwitchUserOnline,YouTubeChannelsView,TournamentDetailsChallongeView,StarGGTournamentListView,EventSpecialListView, ChallongeTournamentListView, PostListView
 
 app_name = 'fighters'  # Asegúrate de que 'fighters' sea una cadena
 
@@ -11,5 +11,6 @@ urlpatterns = [
     path('stream-online/', TwitchUserOnline.as_view(), name='stream-online'),
     path('posts/', PostListView.as_view(), name='post-list'),
     path('stream-online-youtube/', YouTubeChannelsView.as_view(), name='streams-youtube'),
+    path('event-special', EventSpecialListView.as_view(), name='event-special'),
     
 ]

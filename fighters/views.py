@@ -5,11 +5,17 @@ import traceback
 import requests
 from django.conf import settings
 from .utils import has_passed_and_more_than_3_days
-from .models import StarGGTournament, ChallongeTournament,Post,StreamUser
-from .serializers import StarGGTournamentSerializer, ChallongeTournamentSerializer, PostSerializer,StreamUserSerializer
+from .models import StarGGTournament, ChallongeTournament,Post,StreamUser, EventSpecial
+from .serializers import StarGGTournamentSerializer, ChallongeTournamentSerializer, PostSerializer,StreamUserSerializer,EventSpecialSerializer
 from django.core.cache import cache
 import challonge
 import logging
+
+class EventSpecialListView(APIView):
+    def get(self, requet, format=None):
+        events = EventSpecial.objects.all()
+        serializer = EventSpecialSerializer(events, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class StarGGTournamentListView(APIView):
     def get(self, request, format=None):

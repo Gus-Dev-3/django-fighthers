@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import StarGGTournament, ChallongeTournament, Post, StreamUser
+from .models import StarGGTournament, ChallongeTournament, Post, StreamUser, EventSpecial, Tag
 
 
 admin.site.register(StarGGTournament)
@@ -48,3 +48,23 @@ class PostAdmin(admin.ModelAdmin):
 # Registra el modelo con el admin
 admin.site.register(Post, PostAdmin)
 admin.site.register(StreamUser)
+
+class TagAdmin(admin.ModelAdmin):
+    search_fields = ['name']  # Permite la búsqueda de tags por nombre
+
+class EventSpecialAdmin(admin.ModelAdmin):
+    autocomplete_fields = ['tags']  # Habilita el minibuscador para los tags
+    list_display = ['title', 'fecha', 'type_event', 'thumbnail']
+    search_fields = ['title', 'type_event']
+    list_filter = ['type_event', 'fecha']
+    
+    def thumbnail(self, obj):
+        if obj.event_img:  # Verifica si hay una imagen
+            # Renderiza una imagen con tamaño adecuado
+            return format_html('<img src="{}" width="100" height="auto" />', obj.event_img.url)
+        return ""  # Si no hay imagen, no muestra nada
+    
+    thumbnail.short_description = 'Imagen'
+
+admin.site.register(Tag, TagAdmin)
+admin.site.register(EventSpecial, EventSpecialAdmin)

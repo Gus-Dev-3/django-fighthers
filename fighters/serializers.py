@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import StarGGTournament, ChallongeTournament, Post,StreamUser
+from .models import StarGGTournament, ChallongeTournament, Post,StreamUser, EventSpecial, Tag
 
 
 class StarGGTournamentSerializer(serializers.ModelSerializer):
@@ -40,3 +40,18 @@ class StreamUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = StreamUser
         fields = ['user_name', 'platform']  # Los campos que quieres incluir en la respuesta
+        
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ['name']  # Ajusta los campos según necesites
+
+class EventSpecialSerializer(serializers.ModelSerializer):
+    tags = serializers.SerializerMethodField()  # Usa un método para serializar los tags
+
+    class Meta:
+        model = EventSpecial
+        fields = '__all__'
+
+    def get_tags(self, obj):
+        return [tag.name for tag in obj.tags.all()]

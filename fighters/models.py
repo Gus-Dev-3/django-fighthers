@@ -55,3 +55,33 @@ class StreamUser(models.Model):
     def __str__(self):
         return f"{self.user_name} - {self.get_platform_display()}"
 
+class Tag(models.Model):
+    name = models.CharField(max_length=30, unique=True)
+
+    def __str__(self):
+        return self.name
+
+class EventSpecial(models.Model):
+    TYPE_EVENT = (
+        ('ONLINE', 'Online'),
+        ('PRESENCIAL', 'Presencial'),
+        ('ONLINE_PRESENCIAL', 'Online-Presencial'),
+        ('ESPECIAL', 'Especial'),
+    )
+
+    def validate_image(fieldfile_obj):
+        filesize = fieldfile_obj.file.size
+        megabyte_limit = 2.0
+        if filesize > megabyte_limit * 1024 * 1024:
+            raise ValidationError("Tamaño Máximo %sMB" % str(megabyte_limit))
+
+    title = models.CharField(max_length=75)
+    event_img = models.ImageField(upload_to='event', blank=False, validators=[validate_image])
+    fecha = models.DateTimeField()
+    type_event = models.CharField(max_length=20, choices=TYPE_EVENT)
+    tags = models.ManyToManyField(Tag, related_name='events')
+
+    def __str__(self):
+        return self.title
+    
+
