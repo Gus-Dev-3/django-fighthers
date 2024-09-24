@@ -80,6 +80,7 @@ class EventSpecial(models.Model):
     fecha = models.DateTimeField()
     type_event = models.CharField(max_length=20, choices=TYPE_EVENT)
     tags = models.ManyToManyField(Tag, related_name='events')
+    url_info = models.URLField(blank=True)
 
     def __str__(self):
         return self.title
